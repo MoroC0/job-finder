@@ -29,10 +29,19 @@ Open `http://localhost:3000` after the dev server starts.
 
 ## Workflow
 
-1. Create a branch for each feature or experiment.
-2. Make small, testable changes.
+This repository is primarily for learning and experimentation. Use the workflow below to keep changes small and easy to review.
+
+1. Create a new branch for each feature, experiment, or learning task.
+2. Work on one thing at a time.
 3. Commit often with clear messages.
-4. Use the GitHub Actions CI workflow to verify builds.
+4. Run `npm run build` and `npm run typecheck` before pushing.
+5. Use the GitHub Actions CI workflow in `.github/workflows/ci.yml` to verify builds.
+
+## Learning notes
+
+- Treat this repo as a personal sandbox.
+- Experiment with one concept per branch.
+- Record what you learn in commit messages or issue notes.
 
 ## Next improvements
 
