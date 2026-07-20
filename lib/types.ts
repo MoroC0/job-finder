@@ -3,9 +3,20 @@ export interface Job {
   title: string;
   company: string;
   location: string;
-  type: 'Full-time' | 'Part-time' | 'Contract' | 'Remote' | 'Internship';
+  type: string;
   posted: string;
+  postedAt?: string;
   description: string;
   source?: string;
   url?: string;
+}
+
+export type JobPostingStatus = 'original' | 'reposted' | 'unknown';
+
+export interface JobDetails {
+  applicantCount: number | null;
+  applicantCountIsLowerBound: boolean;
+  applicantCountLabel: string;
+  postingStatus: JobPostingStatus;
+  postingStatusLabel: string;
 }

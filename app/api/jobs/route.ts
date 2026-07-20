@@ -15,7 +15,10 @@ const JOB_TYPE_VALUES = ['any', 'full-time', 'part-time', 'contract', 'temporary
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const sourceParam = searchParams.get('source');
+  const sourceParams = searchParams.getAll('source')
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
   const keywordsParam = searchParams.get('keywords');
   const locationParam = searchParams.get('location');
   const companyParam = searchParams.get('company');
@@ -23,19 +26,21 @@ export async function GET(request: Request) {
   const experienceLevelParam = searchParams.get('experienceLevel');
   const workplaceTypeParam = searchParams.get('workplaceType');
   const jobTypeParam = searchParams.get('jobType');
+  const resultLimitParam = searchParams.get('resultLimit');
 
-  if (sourceParam && !isJobSourceKey(sourceParam)) {
+  const invalidSource = sourceParams.find((source) => !isJobSourceKey(source));
+  if (invalidSource) {
     return NextResponse.json(
       {
-        error: `Unsupported source "${sourceParam}".`,
+        error: `Unsupported source "${invalidSource}".`,
         validSources: JOB_SOURCE_KEYS,
       },
       { status: 400 }
     );
   }
 
-  const requestedSources: JobSourceKey[] | undefined = sourceParam
-    ? [sourceParam as JobSourceKey]
+  const requestedSources: JobSourceKey[] | undefined = sourceParams.length > 0
+    ? [...new Set(sourceParams as JobSourceKey[])]
     : undefined;
   const search: JobSearchParams = {
     keywords: keywordsParam ?? DEFAULT_JOB_SEARCH.keywords,
@@ -49,9 +54,21 @@ export async function GET(request: Request) {
     ),
     workplaceType: normalizeEnumValue(workplaceTypeParam, WORKPLACE_TYPE_VALUES, DEFAULT_JOB_SEARCH.workplaceType),
     jobType: normalizeEnumValue(jobTypeParam, JOB_TYPE_VALUES, DEFAULT_JOB_SEARCH.jobType),
+    resultLimit: normalizeResultLimit(resultLimitParam),
   };
   const report = await getJobsReportFromSources(requestedSources, search);
   return NextResponse.json(report);
+}
+
+function normalizeResultLimit(value: string | null): number {
+  if (value === null || value.trim() === '') {
+    return DEFAULT_JOB_SEARCH.resultLimit;
+  }
+
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue)
+    ? Math.min(100, Math.max(1, Math.floor(parsedValue)))
+    : DEFAULT_JOB_SEARCH.resultLimit;
 }
 
 function normalizeEnumValue<T extends string>(value: string | null, options: readonly T[], fallback: T): T {

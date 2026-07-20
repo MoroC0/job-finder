@@ -5,12 +5,17 @@ import { JobList } from '@/components/JobList';
 import type { Job } from '@/lib/types';
 import {
   DEFAULT_JOB_SEARCH,
+  MAX_KEYWORD_QUERIES,
   type JobSearchParams,
   type JobSourceKey,
   type JobSourceResult,
 } from '@/lib/job-service';
 
 const LOCATION_SUGGESTIONS = ['Remote', 'London', 'New York, NY', 'San Francisco Bay Area', 'Berlin', 'Amsterdam', 'Milan'];
+const SOURCE_OPTIONS: Array<{ label: string; value: JobSourceKey }> = [
+  { label: 'LinkedIn', value: 'linkedin' },
+  { label: 'Jobindex.dk', value: 'jobindex' },
+];
 const DATE_POSTED_OPTIONS = [
   { label: 'Any time', value: 'any' },
   { label: 'Past 24 hours', value: 'day' },
@@ -40,11 +45,13 @@ const JOB_TYPE_OPTIONS = [
   { label: 'Temporary', value: 'temporary' },
   { label: 'Internship', value: 'internship' },
 ] as const;
+const RESULT_LIMIT_OPTIONS = [25, 50, 75, 100] as const;
 
 interface JobsApiSuccess {
   requestedSources: JobSourceKey[];
   fallbackApplied: boolean;
   search: Required<JobSearchParams>;
+  keywordQueries: string[];
   jobs: Job[];
   results: JobSourceResult[];
 }
@@ -59,6 +66,7 @@ interface Props {
 }
 
 export function JobSourcePanel({ initialJobs }: Props) {
+  const [selectedSources, setSelectedSources] = useState<JobSourceKey[]>(['linkedin']);
   const [keywords, setKeywords] = useState(DEFAULT_JOB_SEARCH.keywords);
   const [location, setLocation] = useState(DEFAULT_JOB_SEARCH.location);
   const [company, setCompany] = useState(DEFAULT_JOB_SEARCH.company);
@@ -66,6 +74,7 @@ export function JobSourcePanel({ initialJobs }: Props) {
   const [experienceLevel, setExperienceLevel] = useState(DEFAULT_JOB_SEARCH.experienceLevel);
   const [workplaceType, setWorkplaceType] = useState(DEFAULT_JOB_SEARCH.workplaceType);
   const [jobType, setJobType] = useState(DEFAULT_JOB_SEARCH.jobType);
+  const [resultLimit, setResultLimit] = useState(DEFAULT_JOB_SEARCH.resultLimit);
   const [result, setResult] = useState<JobsApiSuccess | null>(null);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -77,7 +86,6 @@ export function JobSourcePanel({ initialJobs }: Props) {
 
     try {
       const params = new URLSearchParams({
-        source: 'linkedin',
         keywords,
         location,
         company,
@@ -85,7 +93,9 @@ export function JobSourcePanel({ initialJobs }: Props) {
         experienceLevel,
         workplaceType,
         jobType,
+        resultLimit: String(resultLimit),
       });
+      selectedSources.forEach((source) => params.append('source', source));
       const response = await fetch(`/api/jobs?${params.toString()}`);
       const data = (await response.json()) as JobsApiSuccess | JobsApiError;
 
@@ -108,12 +118,21 @@ export function JobSourcePanel({ initialJobs }: Props) {
 
   const displayedJobs = result?.jobs ?? initialJobs;
   const activeSearch = result?.search ?? DEFAULT_JOB_SEARCH;
+  const activeKeywordQueries = result?.keywordQueries ?? [DEFAULT_JOB_SEARCH.keywords];
+  const activeSources = result?.requestedSources ?? ['linkedin'];
+
+  function handleSourceToggle(source: JobSourceKey) {
+    setSelectedSources((current) => {
+      if (!current.includes(source)) return [...current, source];
+      return current.length === 1 ? current : current.filter((item) => item !== source);
+    });
+  }
 
   return (
     <div className="search-experience">
       <div className="section-header">
-        <h2>Search LinkedIn</h2>
-        <p>Lead with search first, refine what matters, and keep the latest jobs found visible underneath.</p>
+        <h2>Search job sources</h2>
+        <p>Run the same independent role searches across one or more sources, then review one newest-first feed.</p>
       </div>
       <div className="search-layout">
         <div className="search-form-card">
@@ -124,10 +143,28 @@ export function JobSourcePanel({ initialJobs }: Props) {
                 type="text"
                 value={keywords}
                 onChange={(event) => setKeywords(event.target.value)}
-                placeholder="e.g. product designer, frontend engineer"
+                placeholder="e.g. software engineer, AI engineer, fullstack developer"
                 className="search-field"
               />
+              <small className="field-hint">
+                Separate up to {MAX_KEYWORD_QUERIES} roles with commas. Each role runs as its own search.
+              </small>
             </label>
+            <fieldset className="source-picker field-group--wide">
+              <legend>Sources</legend>
+              <div className="source-options">
+                {SOURCE_OPTIONS.map((option) => (
+                  <label className="source-option" key={option.value}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSources.includes(option.value)}
+                      onChange={() => handleSourceToggle(option.value)}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <label className="field-group">
               <span>Location</span>
               <input
@@ -202,23 +239,45 @@ export function JobSourcePanel({ initialJobs }: Props) {
                 ))}
               </select>
             </label>
+            <label className="field-group">
+              <span>Results to fetch</span>
+              <select
+                value={resultLimit}
+                onChange={(event) => setResultLimit(Number(event.target.value))}
+                className="search-field"
+              >
+                {RESULT_LIMIT_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    Up to {option} jobs
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <div className="search-actions">
             <button type="button" onClick={handleFetch} disabled={loading} className="primary-button">
               {loading ? 'Searching...' : 'Search jobs'}
             </button>
-            <p className="search-helper">LinkedIn is the active source for now, but the filter model is designed to expand to other adapters later.</p>
+            <p className="search-helper">Jobindex uses its allowed first search page and is sorted newest-first locally; pagination is intentionally disabled.</p>
           </div>
         </div>
 
         <aside className="search-summary-card">
           <p className="summary-label">Current focus</p>
-          <h3>{activeSearch.keywords}</h3>
+          <h3>
+            {activeKeywordQueries.length} {activeKeywordQueries.length === 1 ? 'search' : 'concurrent searches'}
+          </h3>
           <p className="summary-copy">
             {activeSearch.location}
             {activeSearch.company ? ` | ${activeSearch.company}` : ''}
           </p>
           <div className="summary-chips">
+            {activeSources.map((source) => (
+              <span className="summary-chip" key={source}>{labelForSource(source)}</span>
+            ))}
+            {activeKeywordQueries.map((keyword) => (
+              <span className="summary-chip" key={keyword}>{keyword}</span>
+            ))}
             {activeSearch.datePosted !== 'any' ? <span className="summary-chip">{labelForOption(DATE_POSTED_OPTIONS, activeSearch.datePosted)}</span> : null}
             {activeSearch.experienceLevel !== 'any' ? (
               <span className="summary-chip">{labelForOption(EXPERIENCE_OPTIONS, activeSearch.experienceLevel)}</span>
@@ -227,6 +286,8 @@ export function JobSourcePanel({ initialJobs }: Props) {
               <span className="summary-chip">{labelForOption(WORKPLACE_OPTIONS, activeSearch.workplaceType)}</span>
             ) : null}
             {activeSearch.jobType !== 'any' ? <span className="summary-chip">{labelForOption(JOB_TYPE_OPTIONS, activeSearch.jobType)}</span> : null}
+            <span className="summary-chip">Newest first</span>
+            <span className="summary-chip">Up to {activeSearch.resultLimit}</span>
             {!hasActiveOptionalFilters(activeSearch) ? <span className="summary-chip">Base search</span> : null}
           </div>
           <div className="status-stack">
@@ -260,7 +321,7 @@ export function JobSourcePanel({ initialJobs }: Props) {
           <p className="eyebrow results-eyebrow">Latest results</p>
           <h2>Last jobs found</h2>
           <p>
-            Results update from your most recent search. Right now you&apos;re looking at <strong>{displayedJobs.length}</strong> LinkedIn jobs.
+            Results update from your most recent search and are ordered newest first. Right now you&apos;re looking at <strong>{displayedJobs.length}</strong> jobs.
           </p>
         </div>
       </div>
@@ -282,6 +343,10 @@ function getStatusClassName(status: JobSourceResult['status']) {
 
 function labelForOption<T extends string>(options: ReadonlyArray<{ label: string; value: T }>, value: T) {
   return options.find((option) => option.value === value)?.label ?? value;
+}
+
+function labelForSource(source: JobSourceKey): string {
+  return SOURCE_OPTIONS.find((option) => option.value === source)?.label ?? source;
 }
 
 function hasActiveOptionalFilters(search: Required<JobSearchParams>) {

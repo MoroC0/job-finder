@@ -11,17 +11,17 @@ export default async function HomePage() {
         <div className="hero-topbar">
           <div>
             <p className="eyebrow">Job Finder</p>
-            <h1>Find sharper job matches with a cleaner LinkedIn search flow</h1>
+            <h1>Find sharper job matches across sources in one clean search flow</h1>
             <p className="description">
-              Search live LinkedIn listings by role, location, company, and a few practical filters, then review the latest jobs found below.
+              Search LinkedIn and Jobindex.dk by role, location, company, and practical filters, then review one merged feed of the newest jobs.
             </p>
           </div>
           <ThemeControls />
         </div>
         <div className="hero-highlights">
           <div className="hero-stat">
-            <span>Active source</span>
-            <strong>LinkedIn</strong>
+            <span>Available sources</span>
+            <strong>LinkedIn + Jobindex.dk</strong>
           </div>
           <div className="hero-stat">
             <span>Default role</span>
@@ -42,7 +42,7 @@ export default async function HomePage() {
         <div className="section-header">
           <h2>Buildable next steps</h2>
           <p>
-            The search model is now ready for future sources too, so the next product work can focus on result quality, deduplication, and saved searches.
+            The multi-source search model is working, so the next product work can focus on persistence, scheduled searches, and richer extraction.
           </p>
         </div>
         <div className="next-steps-grid">
@@ -55,8 +55,8 @@ export default async function HomePage() {
             <p>Persist useful combinations of keywords, company, and location so this becomes a repeatable daily workflow.</p>
           </article>
           <article className="next-step-card">
-            <h3>Prepare more adapters</h3>
-            <p>Reuse the same search contract when we add more websites, instead of redesigning filters source by source.</p>
+            <h3>Normalize more sources</h3>
+            <p>Add more adapters through the shared contract while making source capabilities and limitations visible.</p>
           </article>
         </div>
       </section>
