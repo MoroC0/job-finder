@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getJobDetails, isJobSourceKey } from '@/lib/job-service';
+import type { JobDetails } from '@/lib/types';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -17,9 +18,19 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json(await getJobDetails(source, sourceJobId));
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch job details.' },
-      { status: 502 }
-    );
+    const message = error instanceof Error ? error.message : '';
+    const rateLimited = message.includes('429');
+    const unavailableDetails: JobDetails = {
+      availability: 'temporarily-unavailable',
+      applicantCount: null,
+      applicantCountIsLowerBound: false,
+      applicantCountLabel: rateLimited
+        ? 'Temporarily unavailable (LinkedIn rate limit)'
+        : 'Applicant count temporarily unavailable',
+      postingStatus: 'unknown',
+      postingStatusLabel: 'Listing status temporarily unavailable',
+    };
+
+    return NextResponse.json(unavailableDetails);
   }
 }

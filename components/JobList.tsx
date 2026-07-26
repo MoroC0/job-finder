@@ -13,7 +13,8 @@ type PostedOrder = 'off' | 'newest' | 'oldest';
 type ApplicantOrder = 'off' | 'fewest' | 'most';
 type JobDetailsState = Record<string, JobDetails | null | undefined>;
 
-const DETAIL_CONCURRENCY = 4;
+const DETAIL_CONCURRENCY = 2;
+const DETAIL_REQUEST_ATTEMPTS = 2;
 
 export function JobList({ jobs }: Props) {
   const [postedOrder, setPostedOrder] = useState<PostedOrder>('off');
@@ -138,13 +139,26 @@ export function JobList({ jobs }: Props) {
 }
 
 async function fetchJobDetails(sourceJobId: string): Promise<JobDetails | null> {
-  try {
-    const params = new URLSearchParams({ source: 'linkedin', id: sourceJobId });
-    const response = await fetch(`/api/jobs/details?${params.toString()}`);
-    return response.ok ? ((await response.json()) as JobDetails) : null;
-  } catch {
-    return null;
+  const params = new URLSearchParams({ source: 'linkedin', id: sourceJobId });
+
+  for (let attempt = 1; attempt <= DETAIL_REQUEST_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(`/api/jobs/details?${params.toString()}`);
+      if (response.ok) return (await response.json()) as JobDetails;
+      if (attempt === DETAIL_REQUEST_ATTEMPTS || ![429, 502, 503, 504].includes(response.status)) {
+        return null;
+      }
+
+      const retryAfter = response.headers.get('retry-after');
+      const retryAfterSeconds = retryAfter ? Number(retryAfter) : Number.NaN;
+      await wait(Number.isFinite(retryAfterSeconds) ? retryAfterSeconds * 1000 : 500 * attempt);
+    } catch {
+      if (attempt === DETAIL_REQUEST_ATTEMPTS) return null;
+      await wait(500 * attempt);
+    }
   }
+
+  return null;
 }
 
 async function runWithConcurrency(
@@ -163,6 +177,10 @@ async function runWithConcurrency(
   }
 
   await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, runWorker));
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function sortJobs(

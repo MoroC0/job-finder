@@ -1,5 +1,6 @@
 import { fetchLinkedInJobDetails, fetchLinkedInJobs } from './sources/linkedin-scraper';
 import { fetchJobindexJobs } from './sources/jobindex-scraper';
+import { fetchWorkindenmarkJobs } from './sources/workindenmark-scraper';
 import type { Job, JobDetails } from './types';
 
 export interface JobSearchParams {
@@ -17,6 +18,7 @@ interface JobSourceConfig {
   label: string;
   fetchJobs: (search: Required<JobSearchParams>) => Promise<Job[]>;
   fetchJobDetails?: (sourceJobId: string) => Promise<JobDetails>;
+  maxConcurrentKeywordQueries?: number;
 }
 
 const SOURCE_CONFIG = {
@@ -24,10 +26,17 @@ const SOURCE_CONFIG = {
     label: 'LinkedIn',
     fetchJobs: fetchLinkedInJobs,
     fetchJobDetails: fetchLinkedInJobDetails,
+    maxConcurrentKeywordQueries: 2,
   },
   jobindex: {
     label: 'Jobindex.dk',
     fetchJobs: fetchJobindexJobs,
+    maxConcurrentKeywordQueries: 1,
+  },
+  workindenmark: {
+    label: 'Workindenmark',
+    fetchJobs: fetchWorkindenmarkJobs,
+    maxConcurrentKeywordQueries: 1,
   },
 } as const satisfies Record<string, JobSourceConfig>;
 
@@ -111,10 +120,10 @@ async function getSourceResult(
 ): Promise<JobSourceResult> {
   const config = SOURCE_CONFIG[source];
   const resultLimitPerQuery = Math.ceil(search.resultLimit / keywordQueries.length);
-  const queryResults = await Promise.allSettled(
-    keywordQueries.map((keywords) =>
-      config.fetchJobs({ ...search, keywords, resultLimit: resultLimitPerQuery })
-    )
+  const queryResults = await mapSettledWithConcurrency(
+    keywordQueries,
+    config.maxConcurrentKeywordQueries ?? 1,
+    (keywords) => config.fetchJobs({ ...search, keywords, resultLimit: resultLimitPerQuery })
   );
   const successfulJobs = queryResults.flatMap((result) =>
     result.status === 'fulfilled' ? result.value : []
@@ -142,6 +151,33 @@ async function getSourceResult(
       ? `${failedQueries.length} of ${keywordQueries.length} keyword searches failed; showing the successful results.`
       : undefined,
   };
+}
+
+async function mapSettledWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>
+): Promise<Array<PromiseSettledResult<R>>> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let nextIndex = 0;
+
+  async function runWorker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+
+      try {
+        results[index] = { status: 'fulfilled', value: await worker(items[index]) };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, () => runWorker())
+  );
+  return results;
 }
 
 function getErrorMessage(error: unknown): string {

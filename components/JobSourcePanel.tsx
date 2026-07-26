@@ -15,6 +15,7 @@ const LOCATION_SUGGESTIONS = ['Remote', 'London', 'New York, NY', 'San Francisco
 const SOURCE_OPTIONS: Array<{ label: string; value: JobSourceKey }> = [
   { label: 'LinkedIn', value: 'linkedin' },
   { label: 'Jobindex.dk', value: 'jobindex' },
+  { label: 'Workindenmark', value: 'workindenmark' },
 ];
 const DATE_POSTED_OPTIONS = [
   { label: 'Any time', value: 'any' },
@@ -258,7 +259,9 @@ export function JobSourcePanel({ initialJobs }: Props) {
             <button type="button" onClick={handleFetch} disabled={loading} className="primary-button">
               {loading ? 'Searching...' : 'Search jobs'}
             </button>
-            <p className="search-helper">Jobindex uses its allowed first search page and is sorted newest-first locally; pagination is intentionally disabled.</p>
+            <p className="search-helper">
+              Workindenmark uses its structured public search response; Jobindex remains limited to its first search page.
+            </p>
           </div>
         </div>
 
