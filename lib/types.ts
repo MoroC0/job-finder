@@ -12,8 +12,10 @@ export interface Job {
 }
 
 export type JobPostingStatus = 'original' | 'reposted' | 'unknown';
+export type JobDetailsAvailability = 'available' | 'temporarily-unavailable';
 
 export interface JobDetails {
+  availability: JobDetailsAvailability;
   applicantCount: number | null;
   applicantCountIsLowerBound: boolean;
   applicantCountLabel: string;

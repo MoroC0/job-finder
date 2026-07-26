@@ -13,7 +13,7 @@ export default async function HomePage() {
             <p className="eyebrow">Job Finder</p>
             <h1>Find sharper job matches across sources in one clean search flow</h1>
             <p className="description">
-              Search LinkedIn and Jobindex.dk by role, location, company, and practical filters, then review one merged feed of the newest jobs.
+              Search LinkedIn, Jobindex.dk, and Workindenmark by role, location, company, and practical filters, then review one merged feed of the newest jobs.
             </p>
           </div>
           <ThemeControls />
@@ -21,7 +21,7 @@ export default async function HomePage() {
         <div className="hero-highlights">
           <div className="hero-stat">
             <span>Available sources</span>
-            <strong>LinkedIn + Jobindex.dk</strong>
+            <strong>LinkedIn + Jobindex.dk + Workindenmark</strong>
           </div>
           <div className="hero-stat">
             <span>Default role</span>
