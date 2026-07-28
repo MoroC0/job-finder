@@ -41,5 +41,9 @@ The goal is a source-independent job-finding agent that prioritizes the user's c
 - [ ] Add optional scheduled searches and notifications when the chosen runtime supports them.
 - [ ] Introduce additional job-board adapters behind the shared search contract.
 - [x] Add Jobindex.dk using its structured public first-page search data.
+- [x] Add Workindenmark using its structured public search data.
+- [x] Add a reusable Workday adapter backed by a configurable company registry.
+- [x] Add a conditional Workday country filter using normalized tenant facets.
+- [ ] Add registry health checks so stale Workday tenants are visible before searches fail.
 - [ ] Normalize source-specific fields into one consistent job model.
 - [ ] Add ranking based only on explicit user preferences, with transparent scoring.

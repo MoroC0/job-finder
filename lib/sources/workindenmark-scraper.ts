@@ -1,5 +1,6 @@
 import type { JobSearchParams } from '../job-service';
 import type { Job } from '../types';
+import { getWorkdayCanonicalId } from './workday-utils';
 
 const WORKINDENMARK_API_URL = 'https://workindenmark.jobnet.dk/bff/FindJob/Search';
 const WORKINDENMARK_PAGE_SIZE = 10;
@@ -131,6 +132,7 @@ function toJob(jobAd: WorkindenmarkJobAd): Job | null {
   const postedAt = normalizeDate(jobAd.publicationDate);
   return {
     id: `workindenmark-${jobAd.jobAdId}`,
+    canonicalId: getWorkdayCanonicalId(jobAd.jobAdUrl),
     title: normalizeText(jobAd.title),
     company: normalizeText(jobAd.hiringOrgName),
     location: getLocationLabel(jobAd),
