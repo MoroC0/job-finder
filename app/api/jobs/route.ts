@@ -7,6 +7,7 @@ import {
   type JobSearchParams,
   type JobSourceKey,
 } from '@/lib/job-service';
+import { isWorkdayCountryKey } from '@/lib/sources/workday-countries';
 
 const DATE_POSTED_VALUES = ['any', 'day', 'week', 'month'] as const;
 const EXPERIENCE_LEVEL_VALUES = ['any', 'internship', 'entry', 'associate', 'mid-senior', 'director', 'executive'] as const;
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
   const experienceLevelParam = searchParams.get('experienceLevel');
   const workplaceTypeParam = searchParams.get('workplaceType');
   const jobTypeParam = searchParams.get('jobType');
+  const workdayCountryParam = searchParams.get('workdayCountry');
   const resultLimitParam = searchParams.get('resultLimit');
 
   const invalidSource = sourceParams.find((source) => !isJobSourceKey(source));
@@ -54,6 +56,10 @@ export async function GET(request: Request) {
     ),
     workplaceType: normalizeEnumValue(workplaceTypeParam, WORKPLACE_TYPE_VALUES, DEFAULT_JOB_SEARCH.workplaceType),
     jobType: normalizeEnumValue(jobTypeParam, JOB_TYPE_VALUES, DEFAULT_JOB_SEARCH.jobType),
+    workdayCountry:
+      workdayCountryParam && isWorkdayCountryKey(workdayCountryParam)
+        ? workdayCountryParam
+        : DEFAULT_JOB_SEARCH.workdayCountry,
     resultLimit: normalizeResultLimit(resultLimitParam),
   };
   const report = await getJobsReportFromSources(requestedSources, search);

@@ -7,9 +7,11 @@ A multi-source job search prototype built with **Next.js**, **React**, and **Typ
 - A Next.js app under `app/`
 - Job components in `components/`
 - A job service layer in `lib/`
-- A reusable source-adapter layer with LinkedIn, Jobindex.dk, and Workindenmark implementations
+- A reusable source-adapter layer with LinkedIn, Jobindex.dk, Workindenmark, and multi-company Workday implementations
 - Newest-first LinkedIn pagination with configurable result limits
 - Concurrent comma-separated role searches merged into one newest-first feed
+- A configurable Workday company registry with bounded tenant concurrency and cross-source deduplication
+- A Workday-only country filter backed by normalized country facets shared across company tenants
 - Lazy-loaded applicant counts and original/reposted listing status
 - A small API route at `app/api/jobs/route.ts`
 - A product roadmap in `TODO.md`

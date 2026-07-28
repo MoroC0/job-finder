@@ -10,12 +10,18 @@ import {
   type JobSourceKey,
   type JobSourceResult,
 } from '@/lib/job-service';
+import { WORKDAY_COMPANY_NAMES } from '@/lib/sources/workday-companies';
+import {
+  WORKDAY_COUNTRY_OPTIONS,
+  type WorkdayCountryKey,
+} from '@/lib/sources/workday-countries';
 
 const LOCATION_SUGGESTIONS = ['Remote', 'London', 'New York, NY', 'San Francisco Bay Area', 'Berlin', 'Amsterdam', 'Milan'];
 const SOURCE_OPTIONS: Array<{ label: string; value: JobSourceKey }> = [
   { label: 'LinkedIn', value: 'linkedin' },
   { label: 'Jobindex.dk', value: 'jobindex' },
   { label: 'Workindenmark', value: 'workindenmark' },
+  { label: 'Workday companies', value: 'workday' },
 ];
 const DATE_POSTED_OPTIONS = [
   { label: 'Any time', value: 'any' },
@@ -75,6 +81,9 @@ export function JobSourcePanel({ initialJobs }: Props) {
   const [experienceLevel, setExperienceLevel] = useState(DEFAULT_JOB_SEARCH.experienceLevel);
   const [workplaceType, setWorkplaceType] = useState(DEFAULT_JOB_SEARCH.workplaceType);
   const [jobType, setJobType] = useState(DEFAULT_JOB_SEARCH.jobType);
+  const [workdayCountry, setWorkdayCountry] = useState<WorkdayCountryKey>(
+    DEFAULT_JOB_SEARCH.workdayCountry
+  );
   const [resultLimit, setResultLimit] = useState(DEFAULT_JOB_SEARCH.resultLimit);
   const [result, setResult] = useState<JobsApiSuccess | null>(null);
   const [error, setError] = useState<string>('');
@@ -97,6 +106,9 @@ export function JobSourcePanel({ initialJobs }: Props) {
         resultLimit: String(resultLimit),
       });
       selectedSources.forEach((source) => params.append('source', source));
+      if (selectedSources.includes('workday')) {
+        params.set('workdayCountry', workdayCountry);
+      }
       const response = await fetch(`/api/jobs?${params.toString()}`);
       const data = (await response.json()) as JobsApiSuccess | JobsApiError;
 
@@ -190,8 +202,36 @@ export function JobSourcePanel({ initialJobs }: Props) {
                 onChange={(event) => setCompany(event.target.value)}
                 placeholder="Optional company name"
                 className="search-field"
+                list="company-suggestions"
               />
+              <datalist id="company-suggestions">
+                {WORKDAY_COMPANY_NAMES.map((companyName) => (
+                  <option key={companyName} value={companyName} />
+                ))}
+              </datalist>
+              <small className="field-hint">
+                With Workday selected, leave this blank to search every configured company.
+              </small>
             </label>
+            {selectedSources.includes('workday') ? (
+              <label className="field-group">
+                <span>Workday country</span>
+                <select
+                  value={workdayCountry}
+                  onChange={(event) => setWorkdayCountry(event.target.value as WorkdayCountryKey)}
+                  className="search-field"
+                >
+                  {WORKDAY_COUNTRY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <small className="field-hint">
+                  Workday only. This uses each portal&apos;s country facet instead of the shared location text.
+                </small>
+              </label>
+            ) : null}
             <label className="field-group">
               <span>Date posted</span>
               <select value={datePosted} onChange={(event) => setDatePosted(event.target.value as typeof datePosted)} className="search-field">
@@ -260,7 +300,7 @@ export function JobSourcePanel({ initialJobs }: Props) {
               {loading ? 'Searching...' : 'Search jobs'}
             </button>
             <p className="search-helper">
-              Workindenmark uses its structured public search response; Jobindex remains limited to its first search page.
+              Workday searches a curated company registry in bounded batches; Jobindex remains limited to its first search page.
             </p>
           </div>
         </div>
@@ -289,6 +329,11 @@ export function JobSourcePanel({ initialJobs }: Props) {
               <span className="summary-chip">{labelForOption(WORKPLACE_OPTIONS, activeSearch.workplaceType)}</span>
             ) : null}
             {activeSearch.jobType !== 'any' ? <span className="summary-chip">{labelForOption(JOB_TYPE_OPTIONS, activeSearch.jobType)}</span> : null}
+            {activeSources.includes('workday') && activeSearch.workdayCountry !== 'any' ? (
+              <span className="summary-chip">
+                Workday: {labelForOption(WORKDAY_COUNTRY_OPTIONS, activeSearch.workdayCountry)}
+              </span>
+            ) : null}
             <span className="summary-chip">Newest first</span>
             <span className="summary-chip">Up to {activeSearch.resultLimit}</span>
             {!hasActiveOptionalFilters(activeSearch) ? <span className="summary-chip">Base search</span> : null}
@@ -358,6 +403,7 @@ function hasActiveOptionalFilters(search: Required<JobSearchParams>) {
       search.datePosted !== 'any' ||
       search.experienceLevel !== 'any' ||
       search.workplaceType !== 'any' ||
-      search.jobType !== 'any'
+      search.jobType !== 'any' ||
+      search.workdayCountry !== 'any'
   );
 }

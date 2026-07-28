@@ -1,6 +1,8 @@
 import { fetchLinkedInJobDetails, fetchLinkedInJobs } from './sources/linkedin-scraper';
 import { fetchJobindexJobs } from './sources/jobindex-scraper';
 import { fetchWorkindenmarkJobs } from './sources/workindenmark-scraper';
+import { fetchWorkdayJobs } from './sources/workday-scraper';
+import type { WorkdayCountryKey } from './sources/workday-countries';
 import type { Job, JobDetails } from './types';
 
 export interface JobSearchParams {
@@ -11,6 +13,7 @@ export interface JobSearchParams {
   experienceLevel?: 'any' | 'internship' | 'entry' | 'associate' | 'mid-senior' | 'director' | 'executive';
   workplaceType?: 'any' | 'remote' | 'hybrid' | 'on-site';
   jobType?: 'any' | 'full-time' | 'part-time' | 'contract' | 'temporary' | 'internship';
+  workdayCountry?: WorkdayCountryKey;
   resultLimit?: number;
 }
 
@@ -36,6 +39,11 @@ const SOURCE_CONFIG = {
   workindenmark: {
     label: 'Workindenmark',
     fetchJobs: fetchWorkindenmarkJobs,
+    maxConcurrentKeywordQueries: 1,
+  },
+  workday: {
+    label: 'Workday companies',
+    fetchJobs: fetchWorkdayJobs,
     maxConcurrentKeywordQueries: 1,
   },
 } as const satisfies Record<string, JobSourceConfig>;
@@ -70,6 +78,7 @@ export const DEFAULT_JOB_SEARCH: Required<JobSearchParams> = {
   experienceLevel: 'any',
   workplaceType: 'any',
   jobType: 'any',
+  workdayCountry: 'any',
   resultLimit: 50,
 };
 
@@ -199,6 +208,7 @@ function normalizeSearchParams(search?: JobSearchParams): Required<JobSearchPara
     experienceLevel: search?.experienceLevel || DEFAULT_JOB_SEARCH.experienceLevel,
     workplaceType: search?.workplaceType || DEFAULT_JOB_SEARCH.workplaceType,
     jobType: search?.jobType || DEFAULT_JOB_SEARCH.jobType,
+    workdayCountry: search?.workdayCountry || DEFAULT_JOB_SEARCH.workdayCountry,
     resultLimit: normalizeResultLimit(search?.resultLimit),
   };
 }
@@ -223,7 +233,8 @@ function mergeJobsNewestFirst(jobs: Job[], resultLimit: number): Job[] {
   const jobsById = new Map<string, Job>();
 
   for (const job of jobs) {
-    if (!jobsById.has(job.id)) jobsById.set(job.id, job);
+    const identity = job.canonicalId ?? job.id;
+    if (!jobsById.has(identity)) jobsById.set(identity, job);
   }
 
   return [...jobsById.values()]
