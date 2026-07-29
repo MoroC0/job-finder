@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { JobList } from '@/components/JobList';
 import type { Job } from '@/lib/types';
 import {
   DEFAULT_JOB_SEARCH,
   MAX_KEYWORD_QUERIES,
+  MAX_LINKEDIN_LOCATION_QUERIES,
   type JobSearchParams,
   type JobSourceKey,
   type JobSourceResult,
@@ -16,7 +17,7 @@ import {
   type WorkdayCountryKey,
 } from '@/lib/sources/workday-countries';
 
-const LOCATION_SUGGESTIONS = ['Remote', 'London', 'New York, NY', 'San Francisco Bay Area', 'Berlin', 'Amsterdam', 'Milan'];
+const LOCATION_SUGGESTIONS = ['Remote', 'Copenhagen', 'London', 'Berlin', 'Amsterdam', 'Milan', 'Zürich', 'Basel', 'Bern', 'Geneva', 'Lausanne'];
 const SOURCE_OPTIONS: Array<{ label: string; value: JobSourceKey }> = [
   { label: 'LinkedIn', value: 'linkedin' },
   { label: 'Jobindex.dk', value: 'jobindex' },
@@ -59,6 +60,7 @@ interface JobsApiSuccess {
   fallbackApplied: boolean;
   search: Required<JobSearchParams>;
   keywordQueries: string[];
+  locationQueries: string[];
   jobs: Job[];
   results: JobSourceResult[];
 }
@@ -68,14 +70,13 @@ interface JobsApiError {
   validSources?: JobSourceKey[];
 }
 
-interface Props {
-  initialJobs: Job[];
-}
-
-export function JobSourcePanel({ initialJobs }: Props) {
+export function JobSourcePanel() {
   const [selectedSources, setSelectedSources] = useState<JobSourceKey[]>(['linkedin']);
   const [keywords, setKeywords] = useState(DEFAULT_JOB_SEARCH.keywords);
   const [location, setLocation] = useState(DEFAULT_JOB_SEARCH.location);
+  const [linkedinLocations, setLinkedinLocations] = useState(
+    DEFAULT_JOB_SEARCH.linkedinLocations
+  );
   const [company, setCompany] = useState(DEFAULT_JOB_SEARCH.company);
   const [datePosted, setDatePosted] = useState(DEFAULT_JOB_SEARCH.datePosted);
   const [experienceLevel, setExperienceLevel] = useState(DEFAULT_JOB_SEARCH.experienceLevel);
@@ -89,7 +90,8 @@ export function JobSourcePanel({ initialJobs }: Props) {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  async function handleFetch() {
+  async function handleFetch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setLoading(true);
     setResult(null);
     setError('');
@@ -98,6 +100,7 @@ export function JobSourcePanel({ initialJobs }: Props) {
       const params = new URLSearchParams({
         keywords,
         location,
+        linkedinLocations,
         company,
         datePosted,
         experienceLevel,
@@ -129,10 +132,15 @@ export function JobSourcePanel({ initialJobs }: Props) {
     }
   }
 
-  const displayedJobs = result?.jobs ?? initialJobs;
+  const displayedJobs = result?.jobs ?? [];
   const activeSearch = result?.search ?? DEFAULT_JOB_SEARCH;
   const activeKeywordQueries = result?.keywordQueries ?? [DEFAULT_JOB_SEARCH.keywords];
+  const activeLocationQueries = result?.locationQueries ?? [
+    DEFAULT_JOB_SEARCH.linkedinLocations,
+  ];
   const activeSources = result?.requestedSources ?? ['linkedin'];
+  const hasLinkedIn = selectedSources.includes('linkedin');
+  const hasOtherSources = selectedSources.some((source) => source !== 'linkedin');
 
   function handleSourceToggle(source: JobSourceKey) {
     setSelectedSources((current) => {
@@ -148,7 +156,7 @@ export function JobSourcePanel({ initialJobs }: Props) {
         <p>Run the same independent role searches across one or more sources, then review one newest-first feed.</p>
       </div>
       <div className="search-layout">
-        <div className="search-form-card">
+        <form className="search-form-card" onSubmit={handleFetch}>
           <div className="search-form-grid">
             <label className="field-group field-group--wide">
               <span>Keywords</span>
@@ -178,22 +186,42 @@ export function JobSourcePanel({ initialJobs }: Props) {
                 ))}
               </div>
             </fieldset>
-            <label className="field-group">
-              <span>Location</span>
-              <input
-                type="text"
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder="Choose or type a location"
-                className="search-field"
-                list="location-suggestions"
-              />
-              <datalist id="location-suggestions">
-                {LOCATION_SUGGESTIONS.map((suggestion) => (
-                  <option key={suggestion} value={suggestion} />
-                ))}
-              </datalist>
-            </label>
+            {hasLinkedIn ? (
+              <label className="field-group field-group--wide">
+                <span>LinkedIn locations</span>
+                <input
+                  type="text"
+                  value={linkedinLocations}
+                  onChange={(event) => setLinkedinLocations(event.target.value)}
+                  placeholder="e.g. Zürich; Basel; Geneva"
+                  className="search-field"
+                />
+                <small className="field-hint">
+                  Separate up to {MAX_LINKEDIN_LOCATION_QUERIES} locations with semicolons. Commas remain valid inside a location.
+                </small>
+              </label>
+            ) : null}
+            {hasOtherSources ? (
+              <label className="field-group">
+                <span>Other-source location</span>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  placeholder="Choose or type a location"
+                  className="search-field"
+                  list="location-suggestions"
+                />
+                <datalist id="location-suggestions">
+                  {LOCATION_SUGGESTIONS.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+                <small className="field-hint">
+                  Used by Jobindex.dk, Workindenmark, and Workday when no country facet is selected.
+                </small>
+              </label>
+            ) : null}
             <label className="field-group">
               <span>Company</span>
               <input
@@ -296,22 +324,32 @@ export function JobSourcePanel({ initialJobs }: Props) {
             </label>
           </div>
           <div className="search-actions">
-            <button type="button" onClick={handleFetch} disabled={loading} className="primary-button">
+            <button type="submit" disabled={loading} className="primary-button">
               {loading ? 'Searching...' : 'Search jobs'}
             </button>
             <p className="search-helper">
               Workday searches a curated company registry in bounded batches; Jobindex remains limited to its first search page.
             </p>
           </div>
-        </div>
+        </form>
 
         <aside className="search-summary-card">
           <p className="summary-label">Current focus</p>
           <h3>
-            {activeKeywordQueries.length} {activeKeywordQueries.length === 1 ? 'search' : 'concurrent searches'}
+            {activeKeywordQueries.length} {activeKeywordQueries.length === 1 ? 'role' : 'roles'}
+            {activeSources.includes('linkedin')
+              ? ` across ${activeLocationQueries.length} LinkedIn ${
+                  activeLocationQueries.length === 1 ? 'location' : 'locations'
+                }`
+              : ''}
           </h3>
           <p className="summary-copy">
-            {activeSearch.location}
+            {activeSources.includes('linkedin')
+              ? `LinkedIn: ${activeLocationQueries.join(' | ')}`
+              : activeSearch.location}
+            {activeSources.some((source) => source !== 'linkedin')
+              ? ` | Other sources: ${activeSearch.location}`
+              : ''}
             {activeSearch.company ? ` | ${activeSearch.company}` : ''}
           </p>
           <div className="summary-chips">
@@ -320,6 +358,11 @@ export function JobSourcePanel({ initialJobs }: Props) {
             ))}
             {activeKeywordQueries.map((keyword) => (
               <span className="summary-chip" key={keyword}>{keyword}</span>
+            ))}
+            {activeSources.includes('linkedin') && activeLocationQueries.map((locationQuery) => (
+              <span className="summary-chip" key={`linkedin-${locationQuery}`}>
+                LinkedIn: {locationQuery}
+              </span>
             ))}
             {activeSearch.datePosted !== 'any' ? <span className="summary-chip">{labelForOption(DATE_POSTED_OPTIONS, activeSearch.datePosted)}</span> : null}
             {activeSearch.experienceLevel !== 'any' ? (
@@ -346,7 +389,13 @@ export function JobSourcePanel({ initialJobs }: Props) {
                 <span>{sourceResult.jobs.length} jobs</span>
               </div>
             ))}
-            {!result ? <p className="summary-copy">Showing the default LinkedIn search until you run a new one.</p> : null}
+            {!result ? (
+              <p className="summary-copy">
+                {loading
+                  ? 'Searching the selected sources now.'
+                  : 'No source request has been made yet.'}
+              </p>
+            ) : null}
           </div>
         </aside>
       </div>
@@ -369,11 +418,25 @@ export function JobSourcePanel({ initialJobs }: Props) {
           <p className="eyebrow results-eyebrow">Latest results</p>
           <h2>Last jobs found</h2>
           <p>
-            Results update from your most recent search and are ordered newest first. Right now you&apos;re looking at <strong>{displayedJobs.length}</strong> jobs.
+            {result
+              ? <>Results are ordered newest first. Right now you&apos;re looking at <strong>{displayedJobs.length}</strong> jobs.</>
+              : loading
+                ? 'The previous results were cleared while this search runs.'
+                : 'Choose your search options above, then press Enter or use the search button.'}
           </p>
         </div>
       </div>
-      <JobList jobs={displayedJobs} />
+      {loading ? (
+        <p className="empty-state">Searching for the newest matching jobs...</p>
+      ) : result ? (
+        <JobList jobs={displayedJobs} />
+      ) : (
+        <p className="empty-state">
+          {error
+            ? 'The search did not complete. Adjust the filters or try again.'
+            : 'No jobs are loaded automatically. Run a search when you are ready.'}
+        </p>
+      )}
     </div>
   );
 }

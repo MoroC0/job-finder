@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     .filter(Boolean);
   const keywordsParam = searchParams.get('keywords');
   const locationParam = searchParams.get('location');
+  const linkedinLocationsParam = searchParams.get('linkedinLocations');
   const companyParam = searchParams.get('company');
   const datePostedParam = searchParams.get('datePosted');
   const experienceLevelParam = searchParams.get('experienceLevel');
@@ -47,6 +48,8 @@ export async function GET(request: Request) {
   const search: JobSearchParams = {
     keywords: keywordsParam ?? DEFAULT_JOB_SEARCH.keywords,
     location: locationParam ?? DEFAULT_JOB_SEARCH.location,
+    linkedinLocations:
+      linkedinLocationsParam ?? locationParam ?? DEFAULT_JOB_SEARCH.linkedinLocations,
     company: companyParam ?? DEFAULT_JOB_SEARCH.company,
     datePosted: normalizeEnumValue(datePostedParam, DATE_POSTED_VALUES, DEFAULT_JOB_SEARCH.datePosted),
     experienceLevel: normalizeEnumValue(

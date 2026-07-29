@@ -1,10 +1,8 @@
 import { JobSourcePanel } from '@/components/JobSourcePanel';
 import { ThemeControls } from '@/components/ThemeControls';
-import { DEFAULT_JOB_SEARCH, getJobsFromSources } from '@/lib/job-service';
+import { DEFAULT_JOB_SEARCH } from '@/lib/job-service';
 
-export default async function HomePage() {
-  const jobs = await getJobsFromSources(['linkedin'], DEFAULT_JOB_SEARCH);
-
+export default function HomePage() {
   return (
     <main className="page-shell">
       <section className="hero">
@@ -35,7 +33,7 @@ export default async function HomePage() {
       </section>
 
       <section className="content-section search-section">
-        <JobSourcePanel initialJobs={jobs} />
+        <JobSourcePanel />
       </section>
 
       <section className="content-section results-section">

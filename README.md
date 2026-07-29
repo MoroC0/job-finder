@@ -10,6 +10,7 @@ A multi-source job search prototype built with **Next.js**, **React**, and **Typ
 - A reusable source-adapter layer with LinkedIn, Jobindex.dk, Workindenmark, and multi-company Workday implementations
 - Newest-first LinkedIn pagination with configurable result limits
 - Concurrent comma-separated role searches merged into one newest-first feed
+- Concurrent LinkedIn searches across up to five semicolon-separated locations
 - A configurable Workday company registry with bounded tenant concurrency and cross-source deduplication
 - A Workday-only country filter backed by normalized country facets shared across company tenants
 - Lazy-loaded applicant counts and original/reposted listing status
