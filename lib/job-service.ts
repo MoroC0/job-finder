@@ -8,6 +8,7 @@ import type { Job, JobDetails } from './types';
 export interface JobSearchParams {
   keywords?: string;
   location?: string;
+  linkedinLocations?: string;
   company?: string;
   datePosted?: 'any' | 'day' | 'week' | 'month';
   experienceLevel?: 'any' | 'internship' | 'entry' | 'associate' | 'mid-senior' | 'director' | 'executive';
@@ -22,6 +23,7 @@ interface JobSourceConfig {
   fetchJobs: (search: Required<JobSearchParams>) => Promise<Job[]>;
   fetchJobDetails?: (sourceJobId: string) => Promise<JobDetails>;
   maxConcurrentKeywordQueries?: number;
+  supportsMultipleLocations?: boolean;
 }
 
 const SOURCE_CONFIG = {
@@ -30,6 +32,7 @@ const SOURCE_CONFIG = {
     fetchJobs: fetchLinkedInJobs,
     fetchJobDetails: fetchLinkedInJobDetails,
     maxConcurrentKeywordQueries: 2,
+    supportsMultipleLocations: true,
   },
   jobindex: {
     label: 'Jobindex.dk',
@@ -64,15 +67,18 @@ export interface JobsReport {
   fallbackApplied: boolean;
   search: Required<JobSearchParams>;
   keywordQueries: string[];
+  locationQueries: string[];
   jobs: Job[];
   results: JobSourceResult[];
 }
 
 export const MAX_KEYWORD_QUERIES = 5;
+export const MAX_LINKEDIN_LOCATION_QUERIES = 5;
 export const JOB_SOURCE_KEYS = Object.keys(SOURCE_CONFIG) as JobSourceKey[];
 export const DEFAULT_JOB_SEARCH: Required<JobSearchParams> = {
   keywords: 'software engineer',
   location: 'Remote',
+  linkedinLocations: 'Remote',
   company: '',
   datePosted: 'any',
   experienceLevel: 'any',
@@ -107,8 +113,11 @@ export async function getJobsReportFromSources(
   const selectedSources: JobSourceKey[] = sources && sources.length > 0 ? sources : ['linkedin'];
   const normalizedSearch = normalizeSearchParams(search);
   const keywordQueries = parseKeywordQueries(normalizedSearch.keywords);
+  const locationQueries = parseLinkedInLocationQueries(normalizedSearch.linkedinLocations);
   const results = await Promise.all(
-    selectedSources.map((source) => getSourceResult(source, normalizedSearch, keywordQueries))
+    selectedSources.map((source) =>
+      getSourceResult(source, normalizedSearch, keywordQueries, locationQueries)
+    )
   );
   const jobs = results.flatMap((result) => result.jobs);
 
@@ -117,6 +126,7 @@ export async function getJobsReportFromSources(
     fallbackApplied: sources === undefined || sources.length === 0,
     search: normalizedSearch,
     keywordQueries,
+    locationQueries,
     jobs: mergeJobsNewestFirst(jobs, normalizedSearch.resultLimit),
     results,
   };
@@ -125,14 +135,22 @@ export async function getJobsReportFromSources(
 async function getSourceResult(
   source: JobSourceKey,
   search: Required<JobSearchParams>,
-  keywordQueries: string[]
+  keywordQueries: string[],
+  locationQueries: string[]
 ): Promise<JobSourceResult> {
-  const config = SOURCE_CONFIG[source];
-  const resultLimitPerQuery = Math.ceil(search.resultLimit / keywordQueries.length);
+  const config: JobSourceConfig = SOURCE_CONFIG[source];
+  const sourceLocations = config.supportsMultipleLocations
+    ? locationQueries
+    : [search.location];
+  const searchQueries = keywordQueries.flatMap((keywords) =>
+    sourceLocations.map((location) => ({ keywords, location }))
+  );
+  const resultLimitPerQuery = Math.ceil(search.resultLimit / searchQueries.length);
   const queryResults = await mapSettledWithConcurrency(
-    keywordQueries,
+    searchQueries,
     config.maxConcurrentKeywordQueries ?? 1,
-    (keywords) => config.fetchJobs({ ...search, keywords, resultLimit: resultLimitPerQuery })
+    ({ keywords, location }) =>
+      config.fetchJobs({ ...search, keywords, location, resultLimit: resultLimitPerQuery })
   );
   const successfulJobs = queryResults.flatMap((result) =>
     result.status === 'fulfilled' ? result.value : []
@@ -157,7 +175,7 @@ async function getSourceResult(
     status: jobs.length > 0 ? 'success' : 'empty',
     jobs,
     error: failedQueries.length > 0
-      ? `${failedQueries.length} of ${keywordQueries.length} keyword searches failed; showing the successful results.`
+      ? `${failedQueries.length} of ${searchQueries.length} searches failed; showing the successful results.`
       : undefined,
   };
 }
@@ -199,10 +217,13 @@ function getErrorMessage(error: unknown): string {
 
 function normalizeSearchParams(search?: JobSearchParams): Required<JobSearchParams> {
   const keywordQueries = parseKeywordQueries(search?.keywords);
+  const location = search?.location?.trim() || DEFAULT_JOB_SEARCH.location;
+  const locationQueries = parseLinkedInLocationQueries(search?.linkedinLocations || location);
 
   return {
     keywords: keywordQueries.join(', '),
-    location: search?.location?.trim() || DEFAULT_JOB_SEARCH.location,
+    location,
+    linkedinLocations: locationQueries.join('; '),
     company: search?.company?.trim() || DEFAULT_JOB_SEARCH.company,
     datePosted: search?.datePosted || DEFAULT_JOB_SEARCH.datePosted,
     experienceLevel: search?.experienceLevel || DEFAULT_JOB_SEARCH.experienceLevel,
@@ -227,6 +248,22 @@ export function parseKeywordQueries(value?: string): string[] {
       return true;
     })
     .slice(0, MAX_KEYWORD_QUERIES);
+}
+
+export function parseLinkedInLocationQueries(value?: string): string[] {
+  const rawLocations = value?.trim() || DEFAULT_JOB_SEARCH.linkedinLocations;
+  const seen = new Set<string>();
+
+  return rawLocations
+    .split(';')
+    .map((location) => location.trim())
+    .filter((location) => {
+      const normalizedLocation = location.toLocaleLowerCase();
+      if (!location || seen.has(normalizedLocation)) return false;
+      seen.add(normalizedLocation);
+      return true;
+    })
+    .slice(0, MAX_LINKEDIN_LOCATION_QUERIES);
 }
 
 function mergeJobsNewestFirst(jobs: Job[], resultLimit: number): Job[] {
