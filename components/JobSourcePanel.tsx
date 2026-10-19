@@ -328,7 +328,7 @@ export function JobSourcePanel() {
               {loading ? 'Searching...' : 'Search jobs'}
             </button>
             <p className="search-helper">
-              Workday searches a curated company registry in bounded batches; Jobindex remains limited to its first search page.
+              Locations are searched together, then combined and sorted before the result limit is applied. More locations can take longer to search.
             </p>
           </div>
         </form>
@@ -383,10 +383,24 @@ export function JobSourcePanel() {
           </div>
           <div className="status-stack">
             {(result?.results ?? []).map((sourceResult) => (
-              <div key={sourceResult.key} className="status-row">
-                <strong>{sourceResult.label}</strong>
-                <span className={getStatusClassName(sourceResult.status)}>{sourceResult.status}</span>
-                <span>{sourceResult.jobs.length} jobs</span>
+              <div key={sourceResult.key}>
+                <div className="status-row">
+                  <strong>{sourceResult.label}</strong>
+                  <span className={getStatusClassName(sourceResult.status)}>{sourceResult.status}</span>
+                  <span>{sourceResult.jobs.length} jobs in source shortlist</span>
+                </div>
+                <ul className="query-status-list" aria-label={`${sourceResult.label} search results`}>
+                  {sourceResult.queries.map((query) => (
+                    <li key={`${query.keywords}-${query.location}`}>
+                      <div className="status-row">
+                        <span>{query.location} / {query.keywords}</span>
+                        <span className={getStatusClassName(query.status)}>{query.status}</span>
+                        <span>{query.jobCount} candidates</span>
+                      </div>
+                      {query.error ? <p className="summary-copy">{query.error}</p> : null}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
             {!result ? (
@@ -419,7 +433,7 @@ export function JobSourcePanel() {
           <h2>Last jobs found</h2>
           <p>
             {result
-              ? <>Results are ordered newest first. Right now you&apos;re looking at <strong>{displayedJobs.length}</strong> jobs.</>
+              ? <>Showing <strong>{displayedJobs.length}</strong> jobs combined across your searches, newest first by default. The sort controls below apply to the entire list. A location may have no jobs in this shortlist if its candidates are older.</>
               : loading
                 ? 'The previous results were cleared while this search runs.'
                 : 'Choose your search options above, then press Enter or use the search button.'}

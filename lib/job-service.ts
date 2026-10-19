@@ -59,6 +59,15 @@ export interface JobSourceResult {
   label: string;
   status: JobSourceStatus;
   jobs: Job[];
+  queries: JobQueryResult[];
+  error?: string;
+}
+
+export interface JobQueryResult {
+  keywords: string;
+  location: string;
+  status: JobSourceStatus;
+  jobCount: number;
   error?: string;
 }
 
@@ -145,14 +154,21 @@ async function getSourceResult(
   const searchQueries = keywordQueries.flatMap((keywords) =>
     sourceLocations.map((location) => ({ keywords, location }))
   );
-  const resultLimitPerQuery = Math.ceil(search.resultLimit / searchQueries.length);
   const queryResults = await mapSettledWithConcurrency(
     searchQueries,
     config.maxConcurrentKeywordQueries ?? 1,
     ({ keywords, location }) =>
-      config.fetchJobs({ ...search, keywords, location, resultLimit: resultLimitPerQuery })
+      // Each query needs enough candidates to contribute the global newest N.
+      // Dividing N beforehand discards candidates before dates can be compared.
+      config.fetchJobs({ ...search, keywords, location })
   );
-  const successfulJobs = queryResults.flatMap((result) =>
+  const queries: JobQueryResult[] = queryResults.map((result, index) => ({
+    ...searchQueries[index],
+    status: result.status === 'rejected' ? 'error' : result.value.length > 0 ? 'success' : 'empty',
+    jobCount: result.status === 'fulfilled' ? result.value.length : 0,
+    error: result.status === 'rejected' ? getErrorMessage(result.reason) : undefined,
+  }));
+  const jobGroups = queryResults.map((result) =>
     result.status === 'fulfilled' ? result.value : []
   );
   const failedQueries = queryResults.filter((result) => result.status === 'rejected');
@@ -164,16 +180,33 @@ async function getSourceResult(
       label: config.label,
       status: 'error',
       jobs: [],
+      queries,
       error: getErrorMessage(firstFailure?.status === 'rejected' ? firstFailure.reason : undefined),
     };
   }
 
+  // Round-robin only within equal-date buckets. Count positions separately for
+  // each date, so newer candidates don't shift a location's place in older ties.
+  const successfulJobs = jobGroups.flatMap((group, queryIndex) => {
+    const positionsByDate = new Map<number | string, number>();
+    return group.map((job) => {
+      const timestamp = job.postedAt ? Date.parse(job.postedAt) : Number.NaN;
+      const dateKey = Number.isNaN(timestamp) ? 'unknown' : timestamp;
+      const tieIndex = positionsByDate.get(dateKey) ?? 0;
+      positionsByDate.set(dateKey, tieIndex + 1);
+      return { job, queryIndex, tieIndex };
+    });
+  }).sort((left, right) =>
+    compareJobsNewestFirst(left.job, right.job) ||
+    left.tieIndex - right.tieIndex || left.queryIndex - right.queryIndex
+  ).map(({ job }) => job);
   const jobs = mergeJobsNewestFirst(successfulJobs, search.resultLimit);
   return {
     key: source,
     label: config.label,
     status: jobs.length > 0 ? 'success' : 'empty',
     jobs,
+    queries,
     error: failedQueries.length > 0
       ? `${failedQueries.length} of ${searchQueries.length} searches failed; showing the successful results.`
       : undefined,

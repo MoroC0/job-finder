@@ -593,6 +593,14 @@ button, input, textarea, select {
   margin-top: 1.25rem;
 }
 
+.query-status-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
 .status-row {
   display: flex;
   flex-wrap: wrap;
